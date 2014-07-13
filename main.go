@@ -1,6 +1,7 @@
 package main
 
 import (
+	yoBackClient "github.com/yoed/yoed-client-yo-back"
 	clientInterface "github.com/yoed/yoed-client-interface"
 	"net/http"
 	"log"
@@ -8,18 +9,60 @@ import (
 	"io/ioutil"
 	"encoding/json"
 	"strings"
+	"time"
+	"bytes"
+	"math"
 )
 
 type TransilienYoedClient struct {
-	clientInterface.BaseYoedClient
+	yoBackClient.YoBackYoedClient
 	config *TransilienYoedClientConfig
 }
 
+const Fmt = "15:04"
+type configTime time.Time
+func (ct *configTime) UnmarshalJSON(data []byte) error {
+        b := bytes.NewBuffer(data)
+        dec := json.NewDecoder(b)
+        var s string
+        if err := dec.Decode(&s); err != nil {
+                return err
+        }
+        t, err := time.Parse(Fmt, s)
+        if err != nil {
+                return err
+        }
+        *ct = (configTime)(t)
+        return nil
+}
+
+type configDelta time.Duration
+func (cd *configDelta) UnmarshalJSON(data []byte) error {
+        b := bytes.NewBuffer(data)
+        dec := json.NewDecoder(b)
+        var s string
+        if err := dec.Decode(&s); err != nil {
+                return err
+        }
+        t, err := time.ParseDuration(s)
+        if err != nil {
+                return err
+        }
+        *cd = (configDelta)(t)
+        return nil
+}
+
 type TransilienYoedClientConfig struct {
-	fromStation string
-	toStation string
-	hour string
-	delta int
+	FromStation string
+	ToStation string
+	Hour configTime
+	Delta configDelta
+}
+
+type TransilienApiResponse struct {
+    Data []*struct{
+        TrainHour string
+    }
 }
 
 func (c *TransilienYoedClient) loadConfig(configPath string) (*TransilienYoedClientConfig, error) {
@@ -44,7 +87,7 @@ func (c *TransilienYoedClient) Handle(username string) {
    	b := strings.NewReader(jsonDataIn)
 	resp, err := http.Post(url, "application/json", b)
 
-	log.Print("Requesting Transilien API from station %s to station %s", c.config.fromStation, c.config.toStation)
+	log.Print("Requesting Transilien API from station %s to station %s", c.config.FromStation, c.config.ToStation)
 
 	if err != nil {
 		log.Printf("Transilien API error: %s", err)
@@ -59,15 +102,40 @@ func (c *TransilienYoedClient) Handle(username string) {
 		log.Printf("Transilien API response body error: %s", err)
 	} else {
 		log.Printf("Transilien API response body: %s", string(body))
-		var v []map[string]map[string]string
+		var v []*TransilienApiResponse
         json.Unmarshal(body, &v) 
-        c.parseData(v[0]["data"])
         log.Printf("Transilien unmarshalled data %v", v)
+        if c.trainIsOnTime(v[0]) {
+        	c.YoBackYoedClient.Handle(username)
+        }
 	}
 }
 
-func (c *TransilienYoedClient) parseData(data map[string]string) {
+func (c *TransilienYoedClient) trainIsOnTime(data *TransilienApiResponse) bool {
 	log.Printf("Parse data %v", data)
+
+	hourPlusDelta := time.Time(c.config.Hour).Add(time.Duration(c.config.Delta))
+	for _, aData := range data.Data {
+		log.Printf("Data: %v", aData.TrainHour)
+		p, err := time.Parse("02/01/2006 15:04", string(aData.TrainHour))
+		if err != nil {
+			log.Printf("Error parsing train time: %s", err)
+			continue
+		}
+
+		trainHourParsed, err := time.Parse(Fmt, p.Format(Fmt))
+		if err != nil {
+			log.Printf("Error parsing train hour: %s", err)
+			continue
+		}
+		delta := trainHourParsed.Sub(hourPlusDelta)
+		if time.Time(c.config.Hour).Equal(p) || math.Abs(float64(delta)) <= math.Abs(float64(c.config.Delta)) {
+			log.Printf("On time!")
+			return true
+		}
+	}
+
+	return false
 }
 
 func NewTransilienYoedClient() (*TransilienYoedClient, error) {
@@ -79,12 +147,12 @@ func NewTransilienYoedClient() (*TransilienYoedClient, error) {
 	}
 
 	c.config = config
-	baseClient, err := clientInterface.NewBaseYoedClient()
+	baseClient, err := yoBackClient.NewYoBackYoedClient()
 
 	if err != nil {
 		return nil, err
 	}
-	c.BaseYoedClient = *baseClient
+	c.YoBackYoedClient = *baseClient
 
 	return c, nil
 }
