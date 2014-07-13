@@ -83,7 +83,8 @@ func (c *TransilienYoedClient) loadConfig(configPath string) (*TransilienYoedCli
 
 func (c *TransilienYoedClient) Handle(username string) {
 	url := "http://transilien.ods.ocito.com/ods/transilien/iphone"
-   	jsonDataIn := `[{"target":"/transilien/getNextTrains","map":{"codeArrivee":"PMP","codeDepart":"VMK"},"serial":"4"}]`
+   	jsonDataIn := `[{"target":"/transilien/getNextTrains","map":{"codeArrivee":"`+c.config.ToStation+`","codeDepart":"`+c.config.FromStation+`"},"serial":"4"}]`
+   	log.Printf(jsonDataIn)
    	b := strings.NewReader(jsonDataIn)
 	resp, err := http.Post(url, "application/json", b)
 
