@@ -6,7 +6,7 @@ Yo'ed client sending back a Yo if a train is on time on the Paris Transilien net
 #Installation
 You need the [go](http://golang.org) package on your machine to get the source
 
-`go get github.com/yoed/yoed-server`
+`go get github.com/yoed/yoed-client-transilien`
 
 #Configuration
 Create a `config.json` file aside the executable program.
