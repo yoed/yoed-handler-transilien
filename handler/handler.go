@@ -20,43 +20,43 @@ type Handler struct {
 }
 
 const Fmt = "15:04"
-type configTime time.Time
-func (ct *configTime) UnmarshalJSON(data []byte) error {
-        b := bytes.NewBuffer(data)
-        dec := json.NewDecoder(b)
-        var s string
-        if err := dec.Decode(&s); err != nil {
-                return err
-        }
-        t, err := time.Parse(Fmt, s)
-        if err != nil {
-                return err
-        }
-        *ct = (configTime)(t)
-        return nil
+type configInterval time.Duration
+func (ct *configInterval) UnmarshalJSON(data []byte) error {
+    b := bytes.NewBuffer(data)
+    dec := json.NewDecoder(b)
+    var s string
+    if err := dec.Decode(&s); err != nil {
+            return err
+    }
+    t, err := time.ParseDuration(s)
+    if err != nil {
+       return err
+    }
+    *ct = (configInterval)(t)
+    return nil
 }
 
 type configDelta time.Duration
 func (cd *configDelta) UnmarshalJSON(data []byte) error {
-        b := bytes.NewBuffer(data)
-        dec := json.NewDecoder(b)
-        var s string
-        if err := dec.Decode(&s); err != nil {
-                return err
-        }
-        t, err := time.ParseDuration(s)
-        if err != nil {
-                return err
-        }
-        *cd = (configDelta)(t)
-        return nil
+    b := bytes.NewBuffer(data)
+    dec := json.NewDecoder(b)
+    var s string
+    if err := dec.Decode(&s); err != nil {
+            return err
+    }
+    t, err := time.ParseDuration(s)
+    if err != nil {
+            return err
+    }
+    *cd = (configDelta)(t)
+    return nil
 }
 
 type Config struct {
 	httpInterface.Config
 	FromStation string
 	ToStation string
-	Hour configTime
+	Interval configInterval
 	Delta configDelta
 }
 
@@ -69,7 +69,6 @@ type TransilienApiResponse struct {
 func (c *Handler) Handle(username string) {
 	url := "http://transilien.ods.ocito.com/ods/transilien/iphone"
    	jsonDataIn := `[{"target":"/transilien/getNextTrains","map":{"codeArrivee":"`+c.Config.ToStation+`","codeDepart":"`+c.Config.FromStation+`"},"serial":"4"}]`
-   	log.Printf(jsonDataIn)
    	b := strings.NewReader(jsonDataIn)
 	resp, err := http.Post(url, "application/json", b)
 
@@ -100,7 +99,8 @@ func (c *Handler) Handle(username string) {
 func (c *Handler) trainIsOnTime(data *TransilienApiResponse) bool {
 	log.Printf("Parse data %v", data)
 
-	hourPlusDelta := time.Time(c.Config.Hour).Add(time.Duration(c.Config.Delta))
+	hourPlusInterval := time.Now().Add(time.Duration(c.Config.Interval))
+	hourPlusDelta := time.Now().Add(time.Duration(c.Config.Delta))
 	for _, aData := range data.Data {
 		log.Printf("Data: %v", aData.TrainHour)
 		p, err := time.Parse("02/01/2006 15:04", string(aData.TrainHour))
@@ -115,7 +115,7 @@ func (c *Handler) trainIsOnTime(data *TransilienApiResponse) bool {
 			continue
 		}
 		delta := trainHourParsed.Sub(hourPlusDelta)
-		if time.Time(c.Config.Hour).Equal(p) || math.Abs(float64(delta)) <= math.Abs(float64(c.Config.Delta)) {
+		if hourPlusInterval.Equal(p) || math.Abs(float64(delta)) <= math.Abs(float64(c.Config.Delta)) {
 			log.Printf("On time!")
 			return true
 		}
