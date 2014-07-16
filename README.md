@@ -1,7 +1,7 @@
 Yo'ed transilien
 ======================
 
-Yo'ed client sending back a Yo if a train is on time on the Paris Transilien network
+Yo'ed handler sending back a Yo if a train is on time on the Paris Transilien network
 
 #Installation
 You need the [go](http://golang.org) package on your machine to get the source
