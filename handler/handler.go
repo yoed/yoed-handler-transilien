@@ -2,7 +2,7 @@ package handler
 
 import (
 	yoBackHandler "github.com/yoed/yoed-handler-yo-back/handler"
-	clientInterface "github.com/yoed/yoed-client-interface"
+	httpInterface "github.com/yoed/yoed-http-interface"
 
 	"net/http"
 	"log"
@@ -53,7 +53,7 @@ func (cd *configDelta) UnmarshalJSON(data []byte) error {
 }
 
 type Config struct {
-	clientInterface.Config
+	httpInterface.Config
 	FromStation string
 	ToStation string
 	Hour configTime
@@ -128,7 +128,7 @@ func New() *Handler {
 
 	c := &Handler{}
 
-	if err := clientInterface.LoadConfig("./config.json", &c.Config); err != nil {
+	if err := httpInterface.LoadConfig("./config.json", &c.Config); err != nil {
 		log.Fatalf("failed loading config: %s", err)
 	}
 

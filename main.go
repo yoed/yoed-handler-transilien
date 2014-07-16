@@ -1,12 +1,12 @@
 package main
 
 import (
-	clientInterface "github.com/yoed/yoed-client-interface"
+	httpInterface "github.com/yoed/yoed-http-interface"
 	"github.com/yoed/yoed-handler-transilien/handler"
 )
 
 func main() {
 	handler := handler.New()
-	client := clientInterface.New(handler, &handler.Config.Config)
+	client := httpInterface.New(handler, &handler.Config.Config)
 	client.Run()
 }
