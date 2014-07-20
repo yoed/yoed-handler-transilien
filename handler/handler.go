@@ -11,7 +11,6 @@ import (
 	"strings"
 	"time"
 	"bytes"
-	"math"
 )
 
 type Handler struct {
@@ -19,7 +18,6 @@ type Handler struct {
 	Config *Config
 }
 
-const Fmt = "15:04"
 type configInterval time.Duration
 func (ct *configInterval) UnmarshalJSON(data []byte) error {
     b := bytes.NewBuffer(data)
@@ -53,7 +51,7 @@ func (cd *configDelta) UnmarshalJSON(data []byte) error {
 }
 
 type Config struct {
-	httpInterface.Config
+	yoBackHandler.Config
 	FromStation string
 	ToStation string
 	Interval configInterval
@@ -72,7 +70,7 @@ func (c *Handler) Handle(username string) {
    	b := strings.NewReader(jsonDataIn)
 	resp, err := http.Post(url, "application/json", b)
 
-	log.Print("Requesting Transilien API from station %s to station %s", c.Config.FromStation, c.Config.ToStation)
+	log.Printf("Requesting Transilien API from station %s to station %s", c.Config.FromStation, c.Config.ToStation)
 
 	if err != nil {
 		log.Printf("Transilien API error: %s", err)
@@ -88,6 +86,9 @@ func (c *Handler) Handle(username string) {
 	} else {
 		log.Printf("Transilien API response body: %s", string(body))
 		var v []*TransilienApiResponse
+		// For testing purposes
+		// hourPlusInterval := time.Now().Add(time.Duration(c.Config.Interval)).Round(time.Duration(time.Minute))
+		// mockBody := []byte("[{\"data\":[{\"trainDock\":null,\"trainHour\":\""+hourPlusInterval.Format("02/01/2006 15:04")+"\",\"trainLane\":\"2B\",\"trainMention\":null,\"trainMissionCode\":\"PORO\",\"trainNumber\":\"165484\",\"trainTerminus\":\"PMP\",\"type\":\"R\"}]}]")
         json.Unmarshal(body, &v) 
         log.Printf("Transilien unmarshalled data %v", v)
         if c.trainIsOnTime(v[0]) {
@@ -99,28 +100,26 @@ func (c *Handler) Handle(username string) {
 func (c *Handler) trainIsOnTime(data *TransilienApiResponse) bool {
 	log.Printf("Parse data %v", data)
 
-	hourPlusInterval := time.Now().Add(time.Duration(c.Config.Interval))
-	hourPlusDelta := time.Now().Add(time.Duration(c.Config.Delta))
+	intervalDuration := time.Duration(c.Config.Interval)
+	frenchLocation, _ := time.LoadLocation("Europe/Paris") 
+
+	hourPlusInterval := time.Now().Add(intervalDuration).Round(time.Duration(time.Minute))
+	hourPlusDelta := hourPlusInterval.Add(time.Duration(c.Config.Delta))
 	for _, aData := range data.Data {
 		log.Printf("Data: %v", aData.TrainHour)
-		p, err := time.Parse("02/01/2006 15:04", string(aData.TrainHour))
+		p, err := time.ParseInLocation("02/01/2006 15:04", string(aData.TrainHour), frenchLocation) // API's time have no timezone
 		if err != nil {
 			log.Printf("Error parsing train time: %s", err)
 			continue
 		}
 
-		trainHourParsed, err := time.Parse(Fmt, p.Format(Fmt))
-		if err != nil {
-			log.Printf("Error parsing train hour: %s", err)
-			continue
-		}
-		delta := trainHourParsed.Sub(hourPlusDelta)
-		if hourPlusInterval.Equal(p) || math.Abs(float64(delta)) <= math.Abs(float64(c.Config.Delta)) {
+		if (hourPlusInterval.Equal(p) || hourPlusInterval.Before(p)) && (hourPlusDelta.Equal(p) || hourPlusDelta.After(p)) {
 			log.Printf("On time!")
 			return true
 		}
 	}
 
+	log.Printf("No train in %s", intervalDuration)
 	return false
 }
 
@@ -131,6 +130,8 @@ func New() *Handler {
 	if err := httpInterface.LoadConfig("./config.json", &c.Config); err != nil {
 		log.Fatalf("failed loading config: %s", err)
 	}
+
+	c.Handler.Config = &c.Config.Config
 
 	return c
 }

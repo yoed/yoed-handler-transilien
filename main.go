@@ -7,6 +7,6 @@ import (
 
 func main() {
 	handler := handler.New()
-	client := httpInterface.New(handler, &handler.Config.Config)
+	client := httpInterface.New(handler, &handler.Config.Config.Config)
 	client.Run()
 }
