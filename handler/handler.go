@@ -52,8 +52,8 @@ func (cd *configDelta) UnmarshalJSON(data []byte) error {
 
 type Config struct {
 	yoBackHandler.Config
-	FromStation string
-	ToStation string
+	FromStation string `json:"from_station"`
+	ToStation string `json:"to_station"`
 	Interval configInterval
 	Delta configDelta
 }
