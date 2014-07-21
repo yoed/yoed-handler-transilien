@@ -64,7 +64,7 @@ type TransilienApiResponse struct {
     }
 }
 
-func (c *Handler) Handle(username string) {
+func (c *Handler) Handle(username, handle string) {
 	url := "http://transilien.ods.ocito.com/ods/transilien/iphone"
    	jsonDataIn := `[{"target":"/transilien/getNextTrains","map":{"codeArrivee":"`+c.Config.ToStation+`","codeDepart":"`+c.Config.FromStation+`"},"serial":"4"}]`
    	b := strings.NewReader(jsonDataIn)
@@ -92,7 +92,7 @@ func (c *Handler) Handle(username string) {
         json.Unmarshal(body, &v) 
         log.Printf("Transilien unmarshalled data %v", v)
         if c.trainIsOnTime(v[0]) {
-        	c.Handler.Handle(username)
+        	c.Handler.Handle(username, handle)
         }
 	}
 }
